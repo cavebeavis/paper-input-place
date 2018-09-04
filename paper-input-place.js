@@ -51,19 +51,311 @@ See README.MD for more use examples, styling, api and a link to a live demo page
   from HTML and may be out of place here. Review them and
   then delete this comment!
 */
+/*
+  Removed polymer-element
+
 import {
   html,
   PolymerElement
 } from '@polymer/polymer/polymer-element.js';
+
+  Added experimental lit-element: https://github.com/Polymer/lit-element
+*/
+import {LitElement, html} from "@polymer/lit-element/lit-element.js";
 import '@polymer/paper-input/paper-input.js';
 import '@polymer/iron-jsonp-library/iron-jsonp-library.js';
 import '@polymer/iron-icon/iron-icon.js';
 import './paper-input-place-icons.js';
 import { GestureEventListeners } from '@polymer/polymer/lib/mixins/gesture-event-listeners.js';
 
-class PaperInputPlace extends GestureEventListeners(PolymerElement) {
+class PaperInputPlace extends GestureEventListeners(LitElement) {
+    static get properties() {
+        return {
+            /**
+             * Required: A Maps API key. To obtain an API key, see developers.google.com/maps/documentation/javascript/tutorial#api_key.
+             */
+            apiKey: {
+                type: String,
+                //notify: true
+            },
+            /**
+             * Indicates the Google API is loaded and that Autocomplete suggestions and geocoding functions are available
+             */
+            /*apiLoaded: {
+                type: Boolean,
+                //notify: true,
+                //value: false,
+                readOnly: true
+            },*/
+            /**
+             * Whether to hide the error message
+             * If true, the control does not validate that the value is complete (lat/lng, search term, place_id)
+             * and has been chosen from the places drop down.
+             */
+            hideError: {
+                type: Boolean,
+                //value: false
+            },
+            /**
+             * Whether to hide the place icon
+             * If true, the control does not show the place icon in the input box.
+             */
+            hideIcon: {
+                type: Boolean,
+                //value: false
+            },
+            /**
+             * true if the control is disabled
+             */
+            disabled: {
+                type: Boolean,
+                //notify: true,
+                //value: false
+            },
+            /** @private */
+            _geocoder: {
+                type: Object
+            },
 
-  static get template() {
+            /*
+             * region bias options
+             */
+
+            /**
+             * bias search results to a country code  (ISO 3166-1 Alpha-2 country code, case insensitive).
+             */
+            searchCountryCode: {
+                type: String,
+                //value: ""
+            },
+            /**
+             * bias search results to a bounding rectangle.
+             * object properties (all are required):
+             * {
+             *    east: number,  // East longitude in degrees.
+             *    west: number,  // West longitude in degrees.
+             *    north: number, // North latitude in degrees.
+             *    south: number, // South latitude in degrees.
+             * }
+             *
+             */
+            searchBounds: {
+                type: Object
+            },
+
+            /**
+             * added this for this._searchBiasChanged()
+             */
+            searchBoundsStrict: Boolean,
+            /**
+             * bias search results by type
+             * permitted values:
+             *   address
+             *   geocode
+             *   establishment
+             *   (regions)
+             *   (cities)
+             */
+            searchType: {
+                type: String,
+                //value: ""
+            },
+            /**
+             * error message to display if place is invalid (and hideError is false).
+             * Default value is "Invalid - please select a place".
+             */
+            errorMessage: {
+                type: String,
+                //value: "Invalid - please select a place",
+                //notify: true
+            },
+            /**
+             * True if the entered text is not valid - i.e. not a selected place and not previously geocoded
+             */
+            /*invalid: {
+                type: Boolean,
+                //notify: true,
+                readOnly: true,
+                //value: false
+            },*/
+            /**
+             * Internal representation of invalid, True if the entered text is not valid - i.e. not a selected place and not previously geocoded
+             */
+            _invalid: {
+                type: Boolean,
+                //value: false
+            },
+            /**
+             * Floating label for paper-input
+             * @type {String}
+             */
+            label: {
+                type: String,
+                //notify: true,
+                //value: ""
+            },
+            /**
+             * Placeholder for paper-input
+             * @type {String}
+             */
+            placeholder: {
+                type: String,
+                //notify: true,
+                //value: ""
+            },
+            /**
+             * an object - { lat: number, lng: number } - representing the geolocation of the
+             * entered / selected place
+             */
+            /*latLng: {
+                type: Object,
+                //notify: true,
+                readOnly: true,
+                /*value: function () {
+                    return {
+                        lat: 0,
+                        lng: 0
+                    }
+                }*/
+            /*},*/
+            /**
+             * An object containing the place selected or geocoded:
+             * ```
+             *   place_id
+             *   formatted_address
+             *   latLng { lat: lng: }
+             *   search
+             *   basic:
+             *     name
+             *     address
+             *     city
+             *     state
+             *     stateCode
+             *     postalCode
+             *     country
+             *     countryCode
+             *     phone
+             *   placeDetails: additional properties from the google place result
+             *```
+             */
+            /*place: {
+                type: Object,
+                //notify: true,
+                readOnly: true,
+                /*value: function () {
+                    return {};
+                }*/
+            //},
+            /** @private */
+            _places: {
+                type: Object
+            },
+            /**
+             * true if the entry is a required field
+             */
+            required: {
+                type: Boolean,
+                //notify: true,
+                //value: false
+            },
+            /**
+             * Sets the desired language for the input and the autocomplete list.
+             * Normally, Google Places Autocomplete defaults to the browser default language.
+             * This value allows the language to be set to a desired language regardless of the browser default.
+             *
+             * For a list of language codes supported see https://developers.google.com/maps/faq#languagesupport
+             *
+             * *** the value should not be modified after the element is loaded ***
+             */
+            language: {
+                type: String,
+                //value: ""
+            },
+            /**
+             * If true, the element does not load the drawing, geometry or visualization libraries, slightly
+             * reducing overall payload size.
+             *
+             * Important: Do not use this option if the page contains other elements that make usef
+             * of the Google Maps Javascript API (e.g. google-map).  This can cause the maps API to be loaded
+             * more than once generating errors.
+             *
+             * Do not change this value after the element is loaded
+             *
+             */
+            minimizeApi: {
+                type: Boolean,
+                //value: false
+            },
+            /**
+             * An object representing the initial or returned value of the control.
+             * ```
+             * Properties:
+             *   search:  string - the search string
+             *   place_id:  string - the google maps place_id
+             *   latLng:  object {lat: number, lng: number} - latitude/Longitude
+             *```
+             */
+            value: {
+                type: Object,
+                //notify: true,
+                hasChanged: (newValue,oldValue) => this._valueChanged(newValue,oldValue)
+            },
+            /** @private */
+            _value: {
+                type: String,
+                //notify: true,
+                //value: "",
+                hasChanged: (newValue,oldValue) => this._svalChanged(newValue,oldValue)
+            },
+            /**
+             * @private
+             * The url for the google maps api
+             */
+            _gmapApiUrl: {
+                type: String,
+                //notify: true,
+                //computed: 'this._computeUrl(this.apiKey,this.language,this.minimizeApi)'
+            }
+        };
+    }
+
+    /*static get observers() {
+        return [
+            '_searchBiasChanged(this.searchCountryCode,this.searchBounds,this.searchBoundsStrict,this.searchType)'
+        ];
+    }*/
+
+    constructor(){
+      super();
+
+      // read only properties
+      //this.setAttribute('_apiLoaded',false);
+      this.setAttribute('invalid',false);
+      this.setAttribute('_latLng',{
+          lat: 0,
+          lng: 0
+      });
+      this.setAttribute('_place',{});
+
+      // external properties
+      this.hideError = false;
+      this.hideIcon = false;
+      this.disabled = false;
+      this.searchCountryCode = "";
+      this.searchType = "";
+      this.searchBoundsStrict = false;
+      this.errorMessage = "Invalid - please select a place";
+      this._invalid = false;
+      this.label = "";
+      this.placeholder = "";
+      this.required = false;
+      this.language = "";
+      this.minimizeApi = false;
+      this._value = "";
+
+    }
+
+  _render(props) {
     return html `
       <style>
       :host {
@@ -156,7 +448,7 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
         pointer-events: none;
       }
     </style>
-    <template is="dom-if" if="[[apiKey]]" restamp="true">
+    <template is="dom-if" if="${props.apiKey}" restamp="true">
       <!-- 
         NOTE: the GoogleWebComponents collection has not been updated
         to support Polymer 2.0 as of 5/31/2017.  There is no estimated
@@ -168,286 +460,38 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
         even if that control is used elsewhere in your 1.x app, the api will
         not be loaded twice.
         -->
-      <iron-jsonp-library id="ijpl" library-url="[[_gmapApiUrl]]" notify-event="map-api-load" on-map-api-load="_mapsApiLoaded"></iron-jsonp-library>
+      <iron-jsonp-library id="ijpl" library-url="${props._gmapApiUrl}" notify-event="map-api-load" on-map-api-load="${this._mapsApiLoaded}"></iron-jsonp-library>
     </template>
 
-    <paper-input-container id="container" disabled\$="[[disabled]]" invalid="[[invalid]]">
+    <paper-input-container id="container" disabled="${props.disabled}" invalid="${props.invalid}">
 
-      <iron-icon id="prefixicon" hidden\$="[[hideIcon]]" icon="papinpplc:place" slot="prefix"></iron-icon>
+      <iron-icon id="prefixicon" hidden\$="${props.hideIcon}" icon="papinpplc:place" slot="prefix"></iron-icon>
 
-      <label hidden\$="[[!label]]" aria-hidden="true" for="pipIronInput" slot="label">[[label]]</label>
+      <label hidden="${!props.label}" aria-hidden="true" for="pipIronInput" slot="label">${props.label}</label>
 
-      <iron-input bind-value="{{_value}}" slot="input" class="input-element" id="locationsearch" invalid="{{invalid}}">
-        <input id="nativeInput" disabled\$="[[disabled]]" inputmode="text" placeholder\$="[[placeholder]]" on-change="_onChange">
+      <iron-input bind-value="${props._value}" slot="input" class="input-element" id="locationsearch" invalid="${props.invalid}">
+        <input id="nativeInput" disabled="${props.disabled}" inputmode="text" placeholder="${props.placeholder}" on-change="${(e) => this._onChange(e)}">
       </iron-input>
 
-      <iron-icon id="postfixicon" icon="papinpplc:clear" slot="suffix" on-tap="_clearLocation"></iron-icon>
+      <iron-icon id="postfixicon" icon="papinpplc:clear" slot="suffix" on-tap="${(e) => this._clearLocation(e)}"></iron-icon>
 
-      <template is="dom-if" if="[[errorMessage]]">
-        <paper-input-error aria-live="assertive" slot="add-on">[[errorMessage]]</paper-input-error>
+      <template is="dom-if" if="${props.errorMessage}">
+        <paper-input-error aria-live="assertive" slot="add-on">${props.errorMessage}</paper-input-error>
       </template>
 
     </paper-input-container>`;
   }
 
-  static get properties() {
-    return {
-      /**
-       * Required: A Maps API key. To obtain an API key, see developers.google.com/maps/documentation/javascript/tutorial#api_key.
-       */
-      apiKey: {
-        type: String,
-        notify: true
-      },
-      /**
-       * Indicates the Google API is loaded and that Autocomplete suggestions and geocoding functions are available
-       */
-      apiLoaded: {
-        type: Boolean,
-        notify: true,
-        value: false,
-        readOnly: true
-      },
-      /**
-       * Whether to hide the error message
-       * If true, the control does not validate that the value is complete (lat/lng, search term, place_id)
-       * and has been chosen from the places drop down.
-       */
-      hideError: {
-        type: Boolean,
-        value: false
-      },
-      /**
-       * Whether to hide the place icon
-       * If true, the control does not show the place icon in the input box.
-       */
-      hideIcon: {
-        type: Boolean,
-        value: false
-      },
-      /**
-       * true if the control is disabled
-       */
-      disabled: {
-        type: Boolean,
-        notify: true,
-        value: false
-      },
-      /** @private */
-      _geocoder: {
-        type: Object
-      },
-
-      /*
-       * region bias options
-       */
-
-      /**
-       * bias search results to a country code  (ISO 3166-1 Alpha-2 country code, case insensitive).
-       */
-      searchCountryCode: {
-        type: String,
-        value: ""
-      },
-      /**
-       * bias search results to a bounding rectangle.
-       * object properties (all are required):
-       * {
-       *    east: number,  // East longitude in degrees.
-       *    west: number,  // West longitude in degrees.
-       *    north: number, // North latitude in degrees.
-       *    south: number, // South latitude in degrees.  
-       * }
-       * 
-       */
-      searchBounds: {
-        type: Object
-      },
-
-      /**
-       * bias search results by type
-       * permitted values: 
-       *   address
-       *   geocode
-       *   establishment
-       *   (regions) 
-       *   (cities)
-       */
-      searchType: {
-        type: String,
-        value: ""
-      },
-      /**
-       * error message to display if place is invalid (and hideError is false).
-       * Default value is "Invalid - please select a place".
-       */
-      errorMessage: {
-        type: String,
-        value: "Invalid - please select a place",
-        notify: true
-      },
-      /**
-       * True if the entered text is not valid - i.e. not a selected place and not previously geocoded
-       */
-      invalid: {
-        type: Boolean,
-        notify: true,
-        readOnly: true,
-        value: false
-      },
-      /**
-       * Internal representation of invalid, True if the entered text is not valid - i.e. not a selected place and not previously geocoded
-       */
-      _invalid: {
-        type: Boolean,
-        value: false
-      },
-      /**
-       * Floating label for paper-input
-       * @type {String}
-       */
-      label: {
-        type: String,
-        notify: true,
-        value: ""
-      },
-      /**
-       * Placeholder for paper-input
-       * @type {String}
-       */
-      placeholder: {
-        type: String,
-        notify: true,
-        value: ""
-      },
-      /**
-       * an object - { lat: number, lng: number } - representing the geolocation of the
-       * entered / selected place
-       */
-      latLng: {
-        type: Object,
-        notify: true,
-        readOnly: true,
-        value: function () {
-          return {
-            lat: 0,
-            lng: 0
-          }
-        }
-      },
-      /**
-       * An object containing the place selected or geocoded:
-       * ```
-       *   place_id
-       *   formatted_address
-       *   latLng { lat: lng: }
-       *   search
-       *   basic:
-       *     name
-       *     address
-       *     city
-       *     state
-       *     stateCode
-       *     postalCode
-       *     country
-       *     countryCode
-       *     phone
-       *   placeDetails: additional properties from the google place result
-       *```
-       */
-      place: {
-        type: Object,
-        notify: true,
-        readOnly: true,
-        value: function () {
-          return {};
-        }
-      },
-      /** @private */
-      _places: {
-        type: Object
-      },
-      /**
-       * true if the entry is a required field
-       */
-      required: {
-        type: Boolean,
-        notify: true,
-        value: false
-      },
-      /** 
-       * Sets the desired language for the input and the autocomplete list.
-       * Normally, Google Places Autocomplete defaults to the browser default language.
-       * This value allows the language to be set to a desired language regardless of the browser default.
-       * 
-       * For a list of language codes supported see https://developers.google.com/maps/faq#languagesupport
-       * 
-       * *** the value should not be modified after the element is loaded ***
-       */
-      language: {
-        type: String,
-        value: ""
-      },
-      /** 
-       * If true, the element does not load the drawing, geometry or visualization libraries, slightly
-       * reducing overall payload size.
-       * 
-       * Important: Do not use this option if the page contains other elements that make usef
-       * of the Google Maps Javascript API (e.g. google-map).  This can cause the maps API to be loaded
-       * more than once generating errors.
-       *
-       * Do not change this value after the element is loaded
-       * 
-       */
-      minimizeApi: {
-        type: Boolean,
-        value: false
-      },
-      /**
-       * An object representing the initial or returned value of the control.
-       * ```
-       * Properties:
-       *   search:  string - the search string
-       *   place_id:  string - the google maps place_id
-       *   latLng:  object {lat: number, lng: number} - latitude/Longitude
-       *```
-       */
-      value: {
-        type: Object,
-        notify: true,
-        observer: '_valueChanged'
-      },
-      /** @private */
-      _value: {
-        type: String,
-        notify: true,
-        value: "",
-        observer: '_svalChanged'
-      },
-      /** 
-       * @private
-       * The url for the google maps api
-       */
-      _gmapApiUrl: {
-        type: String,
-        notify: true,
-        computed: '_computeUrl(apiKey,language,minimizeApi)'
-      }
-    };
-  }
-
-  static get observers() {
-    return [
-      '_searchBiasChanged(searchCountryCode,searchBounds,searchBoundsStrict,searchType)'
-    ];
-  }
-
   ready() {
-    super.ready();
-    var apiElement = this.querySelector('iron-jsonp-library');
-    if (apiElement && apiElement.libraryLoaded) {
-      this._mapsApiLoaded();
-    }
+      super.ready();
+      var apiElement = this.shadowRoot.querySelector('iron-jsonp-library');
+      if (apiElement && apiElement.libraryLoaded) {
+          this._mapsApiLoaded();
+      }
+  }
+
+  _firstRendered() {
+      this._gmapApiUrl = this._computeUrl(this.apiKey,this.language,this.minimizeApi);
   }
 
   _computeUrl(akey, lang, minApi) {
@@ -461,8 +505,8 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
       this._geocoder = new google.maps.Geocoder();
       this._places = new google.maps.places.Autocomplete(this.$.nativeInput, {});
       google.maps.event.addListener(this._places, 'place_changed', this._onChangePlace.bind(this));
-      this._setApiLoaded(true);
-      this._searchBiasChanged();
+      this.setAttribute('_apiLoaded', true);
+      this._searchBiasChanged(this.searchCountryCode,this.searchBounds,this.searchBoundsStrict,this.searchType);
       this.dispatchEvent(new CustomEvent('api-loaded', {
         detail: {
           text: 'Google api is ready'
@@ -475,27 +519,27 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
    * observer for changes to search bias
    */
   _searchBiasChanged(searchCountryCode, searchBounds, searchBoundsStrict, searchType) {
-    if (this.apiLoaded) {
+    if (this._apiLoaded) {
 
-      if (this.searchBounds &&
-        this.searchBounds.hasOwnProperty('east') &&
-        this.searchBounds.hasOwnProperty('west') &&
-        this.searchBounds.hasOwnProperty('north') &&
-        this.searchBounds.hasOwnProperty('south')
+      if (searchBounds &&
+        searchBounds.hasOwnProperty('east') &&
+        searchBounds.hasOwnProperty('west') &&
+        searchBounds.hasOwnProperty('north') &&
+        searchBounds.hasOwnProperty('south')
       ) {
-        this._places.setBounds(this.searchBounds);
+        this._places.setBounds(searchBounds);
       } else {
         this._places.setBounds();
       }
-      if (this.searchCountryCode && this.searchCountryCode.length == 2) {
+      if (searchCountryCode && searchCountryCode.length === 2) {
         this._places.setComponentRestrictions({
-          country: this.searchCountryCode.toString()
+          country: searchCountryCode.toString()
         });
       } else {
         this._places.setComponentRestrictions();
       }
-      if (this.searchType && ['address', 'geocode', 'establishment', '(regions)', '(cities)'].includes(this.searchType)) {
-        this._places.setTypes([this.searchType.toString()]);
+      if (searchType && ['address', 'geocode', 'establishment', '(regions)', '(cities)'].includes(searchType)) {
+        this._places.setTypes([searchType.toString()]);
       } else {
         this._places.setTypes([]);
       }
@@ -510,7 +554,7 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
       this._invalid = !newValue || !(newValue.place_id && newValue.latLng && newValue.latLng.lat && newValue.latLng
         .lng);
       if (!this.hideError) {
-        this._setInvalid(this.required ? this._invalid : this._invalid && (newValue && newValue.search));
+        this.setAttribute('invalid',(this.required ? this._invalid : this._invalid && (newValue && newValue.search)));
       }
     }
   }
@@ -530,7 +574,7 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
         }
       };
       this._invalid = false;
-      this._setInvalid(false);
+      this.setAttribute('invalid',false);
       return;
     }
     // if blank and not a required input
@@ -543,10 +587,10 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
           lng: 0
         }
       };
-      this._setPlace({});
+      this.setAttribute('_place',{});
       this._invalid = true;
       if (!this.hideError) {
-        this._setInvalid(false);
+          this.setAttribute('invalid',false);
       }
       return;
     }
@@ -567,10 +611,10 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
           lng: 0
         }
       };
-      this._setPlace({});
+        this.setAttribute('_place',{});
       this._invalid = true;
       if (!this.hideError) {
-        this._setInvalid(true);
+          this.setAttribute('invalid',true);
       }
       return;
     }
@@ -583,10 +627,10 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
         lng: 0
       }
     };
-    this._setPlace({});
+      this.setAttribute('_place',{});
     this._invalid = true;
     if (!this.hideError) {
-      this._setInvalid(true);
+        this.setAttribute('invalid',true);
     }
     return;
 
@@ -652,10 +696,10 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
     var pl = this._places.getPlace();
     if (pl.geometry) {
       var p = this._extractPlaceInfo(pl, this.$.nativeInput.value);
-      this._setPlace(p);
+        this.setAttribute('_place',p);
       this._invalid = false;
-      this._setInvalid(false);
-      this._setLatLng({
+      this.setAttribute('invalid',false);
+      this.setAttribute('_latLng',{
         lat: p.latLng.lat,
         lng: p.latLng.lng
       });
@@ -755,8 +799,8 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
    */
   putPlace(newPlace) {
     if (newPlace && newPlace.place_id && newPlace.latLng) {
-      this._setPlace(JSON.parse(JSON.stringify(newPlace)));
-      this._setLatLng({
+      this.setAttribute('_place',JSON.parse(JSON.stringify(newPlace)));
+      this.setAttribute('_latLng',{
         lat: newPlace.latLng.lat,
         lng: newPlace.latLng.lng
       });
