@@ -1,7 +1,7 @@
 # paper-input-place
 (forked from mlisook/paper-input-place)
 
-This is an experimental repository changing mlisook/paper-input-place from Polymer-Element to Lit-Element:
+This is an experimental repository changing [mlisook/paper-input-place](https://github.com/mlisook/paper-input-place) from Polymer-Element to Lit-Element:
 
 Google Places Autocomplete styled as a paper-input, providing a convenient material design input for places.
 
