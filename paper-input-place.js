@@ -788,7 +788,8 @@ class PaperInputPlace extends GestureEventListeners(PolymerElement) {
         bubbles: true,
         cancelable: event.cancelable,
         detail: {
-          text: this.$.nativeInput.value
+          text: this.$.nativeInput.value,
+          value: this.place
         }
       }));
     }
